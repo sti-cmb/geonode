@@ -48,9 +48,10 @@ from geonode.resource.manager import resource_manager
 from geonode.decorators import check_keyword_write_perms
 from geonode.security.utils import get_user_visible_groups, AdvancedSecurityWorkflowManager
 from geonode.base.forms import CategoryForm, TKeywordForm, ThesaurusAvailableForm
-from geonode.base.models import Thesaurus, TopicCategory
+from geonode.base.models import LocalAsset, Thesaurus, TopicCategory
 from geonode.base import enumerations
 
+from geonode.storage.assets import asset_manager
 from .utils import get_download_response
 
 from .models import Document
@@ -157,11 +158,28 @@ class DocumentUploadView(CreateView):
         doc_form = form.cleaned_data
 
         file = doc_form.pop("doc_file", None)
+        # generate asset
         if file:
             tempdir = mkdtemp()
+
             dirname = os.path.basename(tempdir)
+
+            storage_manager = LocalAsset.get_storage_manager()
+
             filepath = storage_manager.save(f"{dirname}/{file.name}", file)
             storage_path = storage_manager.path(filepath)
+
+            # generation of the local asset
+            payload = {
+                "title": doc_form.get("title", file.name),
+                "owner": self.request.user,
+                "description": doc_form.pop("abstract", None),
+                "location": [storage_path],
+                "type": "document",
+            }
+
+            asset = asset_manager.create(LocalAsset, **payload)
+
             self.object = resource_manager.create(
                 None,
                 resource_type=Document,
@@ -170,11 +188,14 @@ class DocumentUploadView(CreateView):
                     doc_url=doc_form.pop("doc_url", None),
                     title=doc_form.pop("title", file.name),
                     extension=doc_form.pop("extension", None),
-                    files=[storage_path],
+                    asset=asset,
                 ),
             )
             if tempdir != os.path.dirname(storage_path):
                 shutil.rmtree(tempdir, ignore_errors=True)
+
+            asset_manager.assign(asset=asset, resource=self.object)
+
         else:
             self.object = resource_manager.create(
                 None,

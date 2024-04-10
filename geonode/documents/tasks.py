@@ -104,8 +104,18 @@ def create_document_thumbnail(self, object_id):
     centering = (0.5, 0.5)
 
     doc_path = None
-    if document.files:
-        doc_path = storage_manager.path(document.files[0])
+
+    # get asset of the resource
+    original_link = document.link_set.filter(link_type="original").first()
+    if original_link is None:
+        raise Exception("Asset not assigned yet, cannot generate thumbnail")
+
+    asset = original_link.asset
+
+    storage_manager = asset.get_storage_manager()
+
+    if asset:
+        doc_path = storage_manager.path(asset.location[0])
     elif document.doc_url:
         doc_path = document.doc_url
         remove_tmp_file = True

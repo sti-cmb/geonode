@@ -34,7 +34,6 @@ from django.core.exceptions import SuspiciousFileOperation
 from geonode.storage.data_retriever import DataItemRetriever, DataRetriever
 
 from . import settings as sm_settings
-
 from abc import ABCMeta, abstractmethod
 from django.core.files.storage import FileSystemStorage
 
@@ -42,6 +41,13 @@ logger = logging.getLogger(__name__)
 
 
 class StorageManagerInterface(metaclass=ABCMeta):
+
+    REGISTRY = {}
+
+    @classmethod
+    def register(cls, type=None):
+        StorageManagerInterface.REGISTRY.update({type: cls})
+
     @abstractmethod
     def delete(self, name):
         pass
@@ -304,6 +310,17 @@ class DefaultStorageManager(StorageManagerInterface):
 
     def generate_filename(self, filename):
         return self._fsm.generate_filename(filename)
+
+
+def StorageManagerFactory(kind="local"):
+    """Factory Method"""
+
+    return StorageManager.REGISTRY.get(kind)()
+
+
+_handlers = [(module_path["type"], import_string(module_path["class"])) for module_path in settings.STORAGE_HANDLERS]
+for _type, obj in _handlers:
+    obj.register(_type)
 
 
 storage_manager = StorageManager()

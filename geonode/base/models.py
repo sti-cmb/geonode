@@ -50,7 +50,6 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.utils.html import strip_tags
 from mptt.models import MPTTModel, TreeForeignKey
-
 from PIL import Image, ImageOps
 
 from polymorphic.models import PolymorphicModel
@@ -86,7 +85,7 @@ from geonode.people import Roles
 from geonode.people.enumerations import ROLE_VALUES
 
 from urllib.parse import urlsplit, urljoin
-from geonode.storage.manager import storage_manager
+from geonode.storage.manager import storage_manager, StorageManagerFactory
 
 
 logger = logging.getLogger(__name__)
@@ -903,8 +902,6 @@ class ResourceBase(PolymorphicModel, PermissionLevelMixin, ItemBase):
     metadata_only = models.BooleanField(
         _("Metadata"), default=False, help_text=_("If true, will be excluded from search")
     )
-
-    files = JSONField(null=True, default=list, blank=True)
 
     blob = JSONField(null=True, default=dict, blank=True)
 
@@ -2021,6 +2018,7 @@ class Link(models.Model):
     name = models.CharField(max_length=255, help_text=_('For example "View in Google Earth"'))
     mime = models.CharField(max_length=255, help_text=_('For example "text/xml"'))
     url = models.TextField(max_length=1000)
+    asset = models.ForeignKey("Asset", null=True, on_delete=models.SET_NULL)
 
     objects = LinkManager()
 
@@ -2127,3 +2125,43 @@ class GroupGeoLimit(models.Model):
 class ExtraMetadata(models.Model):
     resource = models.ForeignKey(ResourceBase, null=False, blank=False, on_delete=models.CASCADE)
     metadata = JSONField(null=True, default=dict, blank=True)
+
+
+class Asset(PolymorphicModel):
+    """
+    A generic data linked to a ResourceBase
+    """
+
+    title = models.CharField(max_length=255, null=False, blank=False)
+    description = models.TextField(null=True, blank=True)
+    type = models.CharField(max_length=255, null=False, blank=False)
+    owner = models.ForeignKey(get_user_model(), null=False, blank=False, on_delete=models.CASCADE)
+    created = models.DateTimeField(default=now)
+
+    class Meta:
+        verbose_name_plural = "Assets"
+
+    @classmethod
+    def storage_manager(cls, kind):
+        return StorageManagerFactory(kind)
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+
+class LocalAsset(Asset):
+    """
+    Local resource, will replace the files
+    """
+
+    location = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        verbose_name_plural = "Local assets"
+
+    @classmethod
+    def get_storage_manager(cls):
+        return super().storage_manager("local")
+
+    def __str__(self) -> str:
+        return super().__str__()
