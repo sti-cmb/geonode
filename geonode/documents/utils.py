@@ -23,6 +23,7 @@
 # Standard Modules
 import os
 import logging
+from geonode.base.models import Asset
 from geonode.storage.manager import storage_manager
 
 # Django functionality
@@ -78,9 +79,13 @@ def get_download_response(request, docid, attachment=False):
         register_event(request, EventType.EVENT_DOWNLOAD, document)
     filename = slugify(os.path.splitext(os.path.basename(document.title))[0])
 
-    if document.files and storage_manager.exists(document.files[0]):
+    resource_asset = Asset.objects.filter(link__resource=document.pk).first()
+
+    manager = resource_asset.get_storage_manager() or storage_manager
+
+    if resource_asset and manager.exists(resource_asset.location[0]):
         return DownloadResponse(
-            storage_manager.open(document.files[0]).file,
+            manager.open(resource_asset.location[0]).file,
             basename=f"{filename}.{document.extension}",
             attachment=attachment,
         )

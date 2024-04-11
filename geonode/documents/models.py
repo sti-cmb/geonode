@@ -27,7 +27,7 @@ from django.utils.functional import classproperty
 from django.utils.translation import gettext_lazy as _
 
 from geonode.client.hooks import hookset
-from geonode.base.models import ResourceBase
+from geonode.base.models import Asset, ResourceBase
 from geonode.groups.conf import settings as groups_settings
 from geonode.documents.enumerations import DOCUMENT_TYPE_MAP, DOCUMENT_MIMETYPE_MAP
 from geonode.security.permissions import VIEW_PERMISSIONS, OWNER_PERMISSIONS, DOWNLOAD_PERMISSIONS
@@ -77,6 +77,10 @@ class Document(ResourceBase):
         }
 
     @property
+    def files(self):
+        return Asset.objects.filter(link__resource=self).first()
+
+    @property
     def name(self):
         if not self.title:
             return str(self.id)
@@ -107,7 +111,7 @@ class Document(ResourceBase):
 
     @property
     def is_file(self):
-        return self.files and self.extension
+        return self.files is not None and self.extension is not None
 
     @property
     def mime_type(self):
