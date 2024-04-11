@@ -2516,15 +2516,43 @@ class BaseApiTests(APITestCase):
             (map, "maps-detail"),
         ):
             for viewname in (typed_viewname, "base-resources-detail"):
-                for field in ("pk", "title", "perms", "links", "linked_resources", "data"):  # test some random fields
+                for field in (
+                    "pk",
+                    "title",
+                    "perms",
+                    "links",
+                    "linked_resources",
+                    "data",
+                    "link",
+                ):  # test some random fields
                     url = reverse(viewname, args=[resource.id])
                     url = f"{url}?exclude[]=*&include[]={field}"
                     response = self.client.get(url, format="json").json()
                     json = next(iter(response.values()))
 
                     self.assertIn(field, json, "Missing content")
-                    self.assertIn("link", json, "Missing content")
-                    self.assertEqual(2, len(json), f"Only expected content was '{field}', found: {json}")
+                    self.assertEqual(1, len(json), f"Only expected content was '{field}', found: {json}")
+
+    def test_presets_base(self):
+        dataset = Dataset.objects.first()
+        doc = Document.objects.first()
+        map = Map.objects.first()
+
+        for resource, typed_viewname in (
+            (dataset, "datasets-detail"),
+            (doc, "documents-detail"),
+            (map, "maps-detail"),
+        ):
+            for viewname in (typed_viewname, "base-resources-detail"):
+                url = reverse(viewname, args=[resource.id])
+                url = f"{url}?api_preset=bare"
+                response = self.client.get(url, format="json").json()
+                json = next(iter(response.values()))
+                self.assertSetEqual(
+                    {"pk", "title"},
+                    set(json.keys()),
+                    f"Bad json content for object {type(resource)} JSON:{json}",
+                )
 
     def test_api_should_return_all_resources_for_admin(self):
         """

@@ -45,6 +45,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.parsers import JSONParser, MultiPartParser
+from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
@@ -86,9 +87,9 @@ from .permissions import (
     ResourceBasePermissionsFilter,
     UserHasPerms,
 )
+
 from .serializers import (
     FavoriteSerializer,
-    UserSerializer,
     PermSpecSerialiazer,
     GroupProfileSerializer,
     ResourceBaseSerializer,
@@ -101,6 +102,7 @@ from .serializers import (
     ExtraMetadataSerializer,
     LinkedResourceSerializer,
 )
+from geonode.people.api.serializers import UserSerializer
 from .pagination import GeoNodeApiPagination
 from geonode.base.utils import validate_extra_metadata
 
@@ -269,7 +271,33 @@ class OwnerViewSet(WithDynamicViewSetMixin, ListModelMixin, RetrieveModelMixin, 
         return queryset.order_by("username")
 
 
-class ResourceBaseViewSet(DynamicModelViewSet, AdvertisedListMixin):
+class ApiPresetsInitializer(APIView):
+    """
+    Replaces the `api_preset` query params with the configured params
+    """
+
+    def initialize_request(self, request, *args, **kwargs):
+        self.replace_presets(request)
+        return super().initialize_request(request, *args, **kwargs)
+
+    def replace_presets(self, request):
+        # we must make the GET mutable since in the filters, some queryparams are popped
+        request.GET._mutable = True
+        try:
+            for preset_name in request.GET.pop("api_preset", []):
+                presets = settings.REST_API_PRESETS.get(preset_name, None)
+                if not presets:
+                    logger.info(f'Preset "{preset_name}" is not defined')  # maybe return 404?
+                    return
+                for param_name in presets.keys():
+                    for param_value in presets.get(param_name):
+                        if param_value not in request.GET.get(param_name, []):
+                            request.GET.appendlist(param_name, param_value)
+        finally:
+            request.GET._mutable = False
+
+
+class ResourceBaseViewSet(ApiPresetsInitializer, DynamicModelViewSet, AdvertisedListMixin):
     """
     API endpoint that allows base resources to be viewed or edited.
     """

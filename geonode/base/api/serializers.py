@@ -30,10 +30,6 @@ from django.contrib.auth import get_user_model
 from django.db.models.query import QuerySet
 from geonode.people import Roles
 from django.http import QueryDict
-from django.contrib.auth.hashers import make_password
-from django.contrib.auth.password_validation import validate_password
-from django.forms import ValidationError as ValidationErrorForm
-
 from deprecated import deprecated
 from rest_framework import serializers
 from rest_framework_gis import fields
@@ -75,6 +71,12 @@ from django.contrib.gis.geos import Polygon
 logger = logging.getLogger(__name__)
 
 
+def user_serializer():
+    import geonode.people.api.serializers as ser
+
+    return ser.UserSerializer
+
+
 class BaseDynamicModelSerializer(DynamicModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -85,6 +87,17 @@ class BaseDynamicModelSerializer(DynamicModelSerializer):
                     path = f"{path}/"
                 url = urljoin(path, str(instance.pk))
                 data["link"] = build_absolute_uri(url)
+
+                parents = []
+                parent = self.parent
+                while parent:
+                    parents.append(type(parent).__name__)
+                    parent = parent.parent
+
+                logger.warning(
+                    f"Deprecated: BaseDynamicModelSerializer should be replaced with proper Field"
+                    f" - Parents: {parents} Root: {type(self).__name__}"
+                )
             except (TypeError, NoReverseMatch) as e:
                 logger.exception(e)
         return data
@@ -266,7 +279,7 @@ class DownloadLinkField(DynamicComputedField):
     def get_attribute(self, instance):
         try:
             logger.info(
-                "This field is deprecated, and will be removed in the future GeoNode version. Please refer to download_urls"
+                f"Field {self.field_name} is deprecated and will be removed in the future GeoNode version. Please refer to download_urls"
             )
             _instance = instance.get_real_instance()
             return _instance.download_url if hasattr(_instance, "download_url") else None
@@ -323,65 +336,33 @@ class FavoriteField(DynamicComputedField):
         return False
 
 
-class UserSerializer(BaseDynamicModelSerializer):
-    class Meta:
-        ref_name = "UserProfile"
-        model = get_user_model()
-        name = "user"
-        view_name = "users-list"
-        fields = ("pk", "username", "first_name", "last_name", "avatar", "perms", "is_superuser", "is_staff", "email")
+class AutoLinkField(DynamicComputedField):
 
-    @staticmethod
-    def password_validation(password_payload):
+    def get_attribute(self, instance):
+        parents = []
+        parent = self.parent
+        while parent:
+            parents.append(type(parent).__name__)
+            parent = parent.parent
+
+        logger.debug(
+            f"AutoLinkField reading Meta from first parent - Parents: {parents} root: {type(self.root).__name__}"
+        )
+
         try:
-            validate_password(password_payload)
-        except ValidationErrorForm as err:
-            raise serializers.ValidationError(detail=",".join(err.messages))
-        return make_password(password_payload)
+            path = reverse(self.parent.Meta.view_name)
+            if not path.endswith("/"):
+                path = f"{path}/"
+            url = urljoin(path, str(instance.pk))
+            return build_absolute_uri(url)
 
-    def validate(self, data):
-        request = self.context["request"]
-        user = request.user
-        # only admins/staff can edit these permissions
-        if not (user.is_superuser or user.is_staff):
-            data.pop("is_superuser", None)
-            data.pop("is_staff", None)
-        # username cant be changed
-        if request.method in ("PUT", "PATCH") and data.get("username"):
-            raise serializers.ValidationError(detail="username cannot be updated")
-        email = data.get("email")
-        # Email is required on post
-        if request.method in ("POST") and settings.ACCOUNT_EMAIL_REQUIRED and not email:
-            raise serializers.ValidationError(detail="email missing from payload")
-        # email should be unique
-        if get_user_model().objects.filter(email=email).exists():
-            raise serializers.ValidationError("A user is already registered with that email")
-        # password validation
-        password = request.data.get("password")
-        if password:
-            data["password"] = self.password_validation(password)
-        return data
+        except AttributeError as e:
+            logger.exception(f"Parents: {parents} root: {type(self.root).__name__}", exc_info=e)
+            return None
 
-    @classmethod
-    def setup_eager_loading(cls, queryset):
-        """Perform necessary eager loading of data."""
-        queryset = queryset.prefetch_related()
-        return queryset
-
-    def to_representation(self, instance):
-        # Dehydrate users private fields
-        request = self.context.get("request")
-        data = super().to_representation(instance)
-        if not request or not request.user or not request.user.is_authenticated:
-            if "perms" in data:
-                del data["perms"]
-        elif not request.user.is_superuser and not request.user.is_staff:
-            if data["username"] != request.user.username:
-                if "perms" in data:
-                    del data["perms"]
-        return data
-
-    avatar = AvatarUrlField(240, read_only=True)
+        except Exception as e:
+            logger.exception(e)
+            return None
 
 
 class ContactRoleField(DynamicComputedField):
@@ -397,7 +378,7 @@ class ContactRoleField(DynamicComputedField):
         return getattr(instance, self.contact_type)
 
     def to_representation(self, value):
-        return [UserSerializer(embed=True, many=False).to_representation(v) for v in value]
+        return [user_serializer()(embed=True, many=False).to_representation(v) for v in value]
 
     def get_pks_of_users_to_set(self, value):
         pks_of_users_to_set = []
@@ -551,12 +532,12 @@ class LinksSerializer(DynamicModelSerializer):
         return ret
 
 
-class ResourceBaseSerializer(BaseDynamicModelSerializer):
+class ResourceBaseSerializer(DynamicModelSerializer):
     pk = serializers.CharField(read_only=True)
     uuid = serializers.CharField(read_only=True)
     resource_type = serializers.CharField(required=False)
     polymorphic_ctype_id = serializers.CharField(read_only=True)
-    owner = DynamicRelationField(UserSerializer, embed=True, read_only=True)
+    owner = DynamicRelationField(user_serializer(), embed=True, read_only=True)
     metadata_author = ContactRoleField(Roles.METADATA_AUTHOR.name, required=False)
     processor = ContactRoleField(Roles.PROCESSOR.name, required=False)
     publisher = ContactRoleField(Roles.PUBLISHER.name, required=False)
@@ -633,6 +614,7 @@ class ResourceBaseSerializer(BaseDynamicModelSerializer):
     linked_resources = DynamicRelationField(
         LinkedResourceEmbeddedSerializer, source="id", deferred=True, required=False, read_only=True
     )
+    link = AutoLinkField(read_only=True)
 
     class Meta:
         model = ResourceBase
@@ -715,6 +697,7 @@ class ResourceBaseSerializer(BaseDynamicModelSerializer):
             "favorite",
             "thumbnail_url",
             "links",
+            "link",
             # TODO
             # csw_typename, csw_schema, csw_mdsource, csw_insert_date, csw_type, csw_anytext, csw_wkt_geometry,
             # metadata_uploaded, metadata_uploaded_preserve, metadata_xml,

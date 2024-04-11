@@ -1,6 +1,6 @@
 # native dependencies
-Pillow==10.2.0
-lxml==5.1.0
+Pillow==10.3.0
+lxml==5.2.1
 psycopg2==2.9.9
 Django==4.2.9
 
@@ -15,7 +15,7 @@ Paver==1.3.4
 python-slugify==8.0.4
 decorator==5.1.1
 celery==5.3.6
-kombu==5.3.5
+kombu==5.3.6
 vine==5.1.0
 tqdm==4.66.2
 Deprecated==1.2.14
@@ -31,7 +31,7 @@ PyMuPDF==1.24.0
 django-allauth==0.61.1
 django-appconf==1.0.6
 django-celery-results==2.5.1
-django-filter==24.1
+django-filter==24.2
 django-imagekit==5.0.0
 django-taggit==5.0.1
 django-markdownify==0.9.3
@@ -42,7 +42,7 @@ django-guardian<2.4.1
 django-downloadview==2.3.0
 django-polymorphic==3.1.0
 django-tastypie<0.15.0
-django-tinymce==3.7.1
+django-tinymce==4.0.0
 django-grappelli==3.0.8
 django-uuid-upload-path==1.0.0
 django-widget-tweaks==1.5.0
@@ -106,10 +106,9 @@ django-storages==1.14.2
 dropbox==11.36.2
 google-cloud-storage==2.16.0
 google-cloud-core==2.4.1
-boto3==1.34.69
+boto3==1.34.74
 
 # Django Caches
-python-memcached<=1.62
 whitenoise==6.6.0
 Brotli==1.1.0
 
@@ -138,7 +137,7 @@ pycountry
 # production
 uWSGI==2.0.24
 gunicorn==21.2.0
-ipython==8.22.2
+ipython==8.23.0
 docker==7.0.0
 invoke==2.2.0
 
@@ -172,4 +171,4 @@ jwcrypto>=1.5.6 # not directly required, pinned by Snyk to avoid a vulnerability
 cryptography>=41.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
 aiohttp>=3.9.0 # not directly required, pinned by Snyk to avoid a vulnerability
 dnspython>=2.6.0rc1 # not directly required, pinned by Snyk to avoid a vulnerability
-nh3==0.2.15
+nh3==0.2.17
