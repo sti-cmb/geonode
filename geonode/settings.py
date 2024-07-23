@@ -2328,6 +2328,7 @@ CELERY_TASK_QUEUES += (
     Queue("importer.copy_geonode_data_table", GEONODE_EXCHANGE, routing_key="importer.copy_geonode_data_table"),
     Queue("importer.copy_raster_file", GEONODE_EXCHANGE, routing_key="importer.copy_raster_file"),
     Queue("importer.rollback", GEONODE_EXCHANGE, routing_key="importer.rollback"),
+    Queue("importer.import_remote_resource", GEONODE_EXCHANGE, routing_key="importer.import_remote_resource"),
 )
 
 DATABASE_ROUTERS = ["importer.db_router.DatastoreRouter"]
@@ -2347,6 +2348,7 @@ IMPORTER_HANDLERS = ast.literal_eval(
     'importer.handlers.xml.handler.XMLFileHandler',\
     'importer.handlers.sld.handler.SLDFileHandler',\
     'importer.handlers.tiles3d.handler.Tiles3DFileHandler',\
+    'importer.handlers.common.remote.BaseRemoteResourceHandler',\
 ]",
     )
 )
