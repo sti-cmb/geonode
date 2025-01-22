@@ -874,6 +874,13 @@ class ResourceBase(PolymorphicModel, PermissionLevelMixin, ItemBase):
         help_text=_("Name of the Remote Service if any."),
     )
 
+    custom_md_help_text = _('a custom metadata field')
+    custom_md = models.TextField(
+            _("Custom Md"),
+            blank=True,
+            null=True,
+            help_text=custom_md_help_text)
+
     # fields controlling security state
     dirty_state = models.BooleanField(
         _("Dirty State"), default=False, help_text=_("Security Rules Are Not Synched with GeoServer!")

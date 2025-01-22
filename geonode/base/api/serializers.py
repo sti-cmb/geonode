@@ -624,6 +624,7 @@ class ResourceBaseSerializer(DynamicModelSerializer):
     processed = serializers.BooleanField(read_only=True)
     state = serializers.CharField(read_only=True)
     sourcetype = serializers.CharField(read_only=True)
+    custom_md = serializers.CharField()
     embed_url = EmbedUrlField(required=False)
     thumbnail_url = ThumbnailUrlField(read_only=True)
     keywords = ComplexDynamicRelationField(SimpleHierarchicalKeywordSerializer, many=True)
@@ -722,6 +723,7 @@ class ResourceBaseSerializer(DynamicModelSerializer):
             "data",
             "subtype",
             "sourcetype",
+            "custom_md",
             "is_copyable",
             "blob",
             "metadata",
